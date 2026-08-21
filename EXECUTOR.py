@@ -1,6 +1,7 @@
 # Standard library
 from datetime import timedelta
 import json
+import re
 import time
 import urllib.parse
 
@@ -29,6 +30,28 @@ UNSCOPED_VALUES = {"", "*", "all", "any", "none", "n/a", "null", "none specified
 def is_unscoped(value):
     """True when a filter value means 'no filter' rather than a real identifier."""
     return str(value).strip().lower() in UNSCOPED_VALUES
+
+
+def _escape_bad_backslashes(text):
+    """Double any backslash that does not begin a valid JSON escape sequence."""
+    valid = set('"\\/bfnrtu')
+    out = []
+    i = 0
+    while i < len(text):
+        c = text[i]
+        if c == "\\":
+            nxt = text[i + 1] if i + 1 < len(text) else ""
+            if nxt in valid:
+                out.append(c)
+                out.append(nxt)
+                i += 2
+                continue
+            out.append("\\\\")
+            i += 1
+            continue
+        out.append(c)
+        i += 1
+    return "".join(out)
 
 
 def get_bearer_token():
@@ -87,7 +110,14 @@ def hunt(gemini_client, threat_hunt_system_message, threat_hunt_user_message, ge
                 )
             )
             print(f"{Fore.GREEN}Successfully completed hunt with {current_model}!{Style.RESET_ALL}")
-            return json.loads(response.text)
+            try:
+                return json.loads(response.text)
+            except json.JSONDecodeError:
+                # Models sometimes emit Windows paths with unescaped backslashes,
+                # which are invalid JSON escapes. Repair and retry once.
+                repaired = _escape_bad_backslashes(response.text)
+                print(f"{Fore.LIGHTYELLOW_EX}Malformed JSON from {current_model}; attempting repair...{Style.RESET_ALL}")
+                return json.loads(repaired)
         except APIError as e:
             if "503" in str(e) or "UNAVAILABLE" in str(e) or "404" in str(e):
                 print(f"{Fore.LIGHTYELLOW_EX}Model {current_model} unavailable or error encountered. Falling back to next model...{Style.RESET_ALL}")
