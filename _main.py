@@ -134,44 +134,43 @@ while True:
     # Display the threat hunt analysis results.
     UTILITIES.display_threats(threat_list=hunt_results.get('findings', []))
 
-    machine_is_isolated = False
-    user_account_is_disabled = False
-
+    # Containment decision: gather all high-confidence findings for this host and
+    # ask the analyst ONCE, so the isolation call is made with the full picture
+    # rather than after each individual finding.
     query_is_about_individual_host = query_context["about_individual_host"]
-    query_is_about_individual_user = query_context["about_individual_user"]
-    query_is_about_network_security_group = query_context["about_network_security_group"]
+    findings = hunt_results.get('findings', [])
 
-    for threat in hunt_results.get('findings', []):
-        threat_confidence_is_high = threat.get("confidence", "").lower() == "high"
-        
-        if query_is_about_individual_host:
-            if threat_confidence_is_high and (not machine_is_isolated):
-                print(Fore.YELLOW + "[!] High confidence threat detected on host:" + Style.RESET_ALL, query_context["device_name"])
-                print(Fore.LIGHTRED_EX + threat.get('title'))
-                confirm = input(f"{Fore.RED}{Style.BRIGHT}Would you like to isolate this VM? (yes/no): " + Style.RESET_ALL).strip().lower()
-                
-                if confirm.startswith("y"):
-                    try:
-                        token = EXECUTOR.get_bearer_token()
-                        machine_id = EXECUTOR.get_mde_workstation_id_from_name(
-                            token=token,
-                            device_name=query_context["device_name"]
-                        )
-                        machine_is_isolated = EXECUTOR.quarantine_virtual_machine(
-                            token=token,
-                            machine_id=machine_id
-                        )
-                    except Exception as e:
-                        print(Fore.RED + f"[!] Containment unavailable: {str(e)[:120]}" + Style.RESET_ALL)
-                        machine_is_isolated = False
-                    if machine_is_isolated:
+    if query_is_about_individual_host:
+        high_confidence = [
+            t for t in findings
+            if t.get("confidence", "").lower() == "high"
+        ]
+
+        if high_confidence:
+            device = query_context["device_name"]
+            print(Fore.YELLOW + f"\n[!] {len(high_confidence)} high confidence threat(s) detected on host:" + Style.RESET_ALL, device)
+            for t in high_confidence:
+                print(Fore.LIGHTRED_EX + f"    - {t.get('title')}" + Style.RESET_ALL)
+
+            confirm = input(
+                f"\n{Fore.RED}{Style.BRIGHT}Isolate {device} from the network? (yes/no): " + Style.RESET_ALL
+            ).strip().lower()
+
+            if confirm.startswith("y"):
+                try:
+                    token = EXECUTOR.get_bearer_token()
+                    machine_id = EXECUTOR.get_mde_workstation_id_from_name(
+                        token=token,
+                        device_name=device
+                    )
+                    if EXECUTOR.quarantine_virtual_machine(token=token, machine_id=machine_id):
                         print(Fore.GREEN + "[+] VM successfully isolated." + Style.RESET_ALL)
                         print(Fore.CYAN + "Reminder: Release the VM from isolation when appropriate at: " + Style.RESET_ALL + "https://security.microsoft.com/")
-                else:
-                    print(Fore.CYAN + "[i] Isolation skipped by user." + Style.RESET_ALL)
-        elif query_is_about_individual_user:
-            pass
-        elif query_is_about_network_security_group:
-            pass
-    
+                    else:
+                        print(Fore.RED + "[!] Isolation request was not accepted by Defender." + Style.RESET_ALL)
+                except Exception as e:
+                    print(Fore.RED + f"[!] Containment unavailable: {str(e)[:120]}" + Style.RESET_ALL)
+            else:
+                print(Fore.CYAN + "[i] Isolation skipped by analyst." + Style.RESET_ALL)
+
     print(f"\n{Fore.GREEN}Ready for your next threat hunting query!{Fore.RESET}\n")
