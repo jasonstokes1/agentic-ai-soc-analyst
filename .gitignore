@@ -1,0 +1,16 @@
+# Secrets - never commit
+_keys.py
+
+# Threat hunt output (contains environment-specific findings)
+_threats.jsonl
+
+# Python
+__pycache__/
+*.pyc
+agent_env/
+venv/
+
+# Editor / OS
+.DS_Store
+*.bak
+*.bak2

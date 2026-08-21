@@ -1,0 +1,6 @@
+google-genai
+colorama
+azure-identity
+azure-monitor-query
+pandas
+requests
