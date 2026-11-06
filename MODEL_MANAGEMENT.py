@@ -43,23 +43,23 @@ def assess_limits(model_name, input_tokens, tier):
     msgs = []
     usage_txt = colorize("input limit", input_tokens, info["max_input_tokens"])
     if input_tokens > info["max_input_tokens"]:
-        msgs.append(f"🚨 ERROR: {usage_txt} exceeds the input limit for {model_name}.")
+        msgs.append(f"ERROR: {usage_txt} exceeds the input limit for {model_name}.")
     elif input_tokens >= WARNING_RATIO * info["max_input_tokens"]:
-        msgs.append(f"⚠️ WARNING: {usage_txt} is at least 80% of the input limit for {model_name}.")
+        msgs.append(f"WARNING: {usage_txt} is at least 80% of the input limit for {model_name}.")
     else:
-        msgs.append(f"✅ Safe: {usage_txt} is within the input limit for {model_name}.")
+        msgs.append(f"Safe: {usage_txt} is within the input limit for {model_name}.")
 
     tpm_limit = info["tier"].get(tier)
     tpm_txt = colorize("rate_limit", input_tokens, tpm_limit)
     if tpm_limit is not None:
         if input_tokens > tpm_limit:
-            msgs.append(f"⚠️ WARNING: {tpm_txt} exceeds the TPM rate limit for {model_name} ({tpm_limit}) — may be too large.")
+            msgs.append(f"WARNING: {tpm_txt} exceeds the TPM rate limit for {model_name} ({tpm_limit}) — may be too large.")
         elif input_tokens >= WARNING_RATIO * tpm_limit:
-            msgs.append(f"⚠️ WARNING: {tpm_txt} is at least 80% of the TPM rate limit for {model_name}.")
+            msgs.append(f"WARNING: {tpm_txt} is at least 80% of the TPM rate limit for {model_name}.")
         else:
-            msgs.append(f"✅ Safe: {tpm_txt} is within the TPM rate limit for {model_name}.")
+            msgs.append(f"Safe: {tpm_txt} is within the TPM rate limit for {model_name}.")
     else:
-        msgs.append(f"ℹ️ No TPM tier limit known for {model_name} at tier '{tier}'.")
+        msgs.append(f"No TPM tier limit known for {model_name} at tier '{tier}'.")
 
     print("\n".join(msgs))
     print("")
